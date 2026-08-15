@@ -1,0 +1,25 @@
+# Go
+backend-go/main
+backend-go/vendor/
+*.exe
+*.out
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.joblib
+.venv/
+venv/
+
+# Environment files
+.env
+
+# Docker / Postgres
+postgres_data/
+
+# OS specific
+.DS_Store
+Thumbs.db
