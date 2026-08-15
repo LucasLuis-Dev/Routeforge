@@ -67,10 +67,10 @@ Para entender em detalhes todos os Requisitos Funcionais (RF), Requisitos Não-F
   - Especificação detalhada de Requisitos (`docs/requirements.md`).
   - Modelagem do banco de dados relacional e migrações SQL (`db/migrations/`).
   - Orquestração inicial via Docker Compose com PostgreSQL.
-- [ ] **Etapa 2: Microsserviço de Predição de Tarifa & ETA (FastAPI)**
-  - Script de geração de dados sintéticos e treino do modelo `RandomForestRegressor`.
-  - Endpoints REST `/health` e `/predict` com Pydantic.
-  - Testes unitários com `pytest` e `Dockerfile` do microsserviço.
+- [x] **Etapa 2: Microsserviço de Predição de Tarifa & ETA (FastAPI)**
+  - Script de geração de dados sintéticos (2.500 amostras) e treino do modelo `RandomForestRegressor`.
+  - Endpoints REST `/health` e `/predict` validados com Pydantic V2.
+  - Testes unitários com `pytest` (100% aprovados) e `Dockerfile` multi-stage executável.
 - [ ] **Etapa 3: Serviço Go — Camada de Domínio & Repositórios (SOLID)**
   - Entidades de domínio (`User`, `Ride`, `PriceHistory`) e interfaces de repositórios.
   - Implementação da camada de persistência com `database/sql`.
