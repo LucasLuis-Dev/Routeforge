@@ -79,8 +79,9 @@ Para entender em detalhes todos os Requisitos Funcionais (RF), Requisitos Não-F
   - Cliente HTTP síncrono com timeout de 2s (`client/ml_client.go`).
   - Lógica de negócios `RideService` com acionamento do **Fallback Pattern** em indisponibilidades de ML.
   - Cobertura por testes unitários com mocks (`stretchr/testify`) 100% aprovados.
-- [ ] **Etapa 5: Serviço Go — Handlers HTTP & Rotas (`go-chi`)**
-  - Implementação dos endpoints REST para cadastro de usuários e fluxo completo da corrida.
+- [x] **Etapa 5: Serviço Go — Handlers HTTP & Rotas (`go-chi`)**
+  - Endpoints REST para cadastro de usuários (`/api/v1/users`), estimativa (`/estimate`), solicitação (`/rides`), aceite (`/accept`), conclusão (`/complete`) e auditoria (`/rides/{id}`).
+  - Roteamento com `go-chi/chi/v5`, middlewares de log/recovery e testes com `httptest`.
 - [ ] **Etapa 6: Conteinerização Multi-stage & Integração End-to-End**
   - `Dockerfile` otimizado para Go.
   - Testes de resiliência em tempo real simulando queda do microsserviço de ML.
