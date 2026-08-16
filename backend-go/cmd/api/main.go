@@ -66,9 +66,10 @@ func main() {
 	healthHandler := handler.NewHealthHandler()
 	userHandler := handler.NewUserHandler(userRepo)
 	rideHandler := handler.NewRideHandler(rideService)
+	authHandler := handler.NewAuthHandler(userRepo)
 
-	// Roteador Chi
-	r := router.NewRouter(healthHandler, userHandler, rideHandler)
+	// Roteador Chi com Auth & Rate Limiter
+	r := router.NewRouter(healthHandler, userHandler, rideHandler, authHandler)
 
 	serverAddr := fmt.Sprintf(":%s", portStr)
 	log.Printf("🚀 Servidor Routeforge API iniciado na porta %s (ML URL: %s)", portStr, mlServiceURL)

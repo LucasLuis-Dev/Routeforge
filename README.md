@@ -11,6 +11,11 @@ O **Routeforge** é um projeto de portfólio backend focado no domínio de mobil
 ### 🌟 Destaques Arquiteturais
 - **Serviço Principal em Go**: API REST desenvolvida com `go-chi`, injeção de dependências por interface e separação rigorosa em camadas (*Handler*, *Service*, *Repository*, *Client*).
 - **Microsserviço de Predição (FastAPI / Python)**: Modelo `RandomForestRegressor` treinado com 2.500 amostras sintéticas para estimar o tempo de chegada (ETA) e o multiplicador de preço dinâmico (*Surge Pricing*) com base na distância e momento temporal.
+- **Segurança & Autenticação Stateless (JWT + RBAC)**:
+  - Autenticação via `POST /api/v1/auth/login` gerando tokens JWT (`golang-jwt/jwt/v5`).
+  - Middlewares de autorização granular por perfil: apenas passageiros (`passenger`) podem solicitar corridas e apenas motoristas (`driver`) podem aceitar corridas, retornando `401 Unauthorized` ou `403 Forbidden` quando não autorizado.
+- **Proteção contra Scrapping e DDoS (Rate Limiting)**:
+  - Rate Limiter por IP em memória (`golang.org/x/time/rate`) no endpoint `/api/v1/rides/estimate`, permitindo até 10 requisições por minuto por IP e respondendo com `429 Too Many Requests` em requisições excedentes.
 - **Resiliência & Alta Disponibilidade (*Fallback Pattern*)**: Cliente HTTP em Go com `timeout` de 2s e mecanismo de **contingência automática**. Se o microsserviço de ML falhar ou estiver indisponível, a API em Go assume uma precificação padrão sem interromper a experiência do usuário.
 - **Documentação Interativa (Swagger / OpenAPI)**:
   - 🚀 **Go API Swagger UI**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
