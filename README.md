@@ -11,6 +11,9 @@ O **Routeforge** é um projeto de portfólio backend focado no domínio de mobil
 ### 🌟 Destaques Arquiteturais
 - **Serviço Principal em Go**: API REST desenvolvida com `go-chi`, injeção de dependências por interface e separação rigorosa em camadas (*Handler*, *Service*, *Repository*, *Client*).
 - **Microsserviço de Predição (FastAPI / Python)**: Modelo `RandomForestRegressor` treinado com 2.500 amostras sintéticas para estimar o tempo de chegada (ETA) e o multiplicador de preço dinâmico (*Surge Pricing*) com base na distância e momento temporal.
+- **Indexação Geográfica em Tempo Real & Caching (Redis 7)**:
+  - **Redis GEOADD & GEOSEARCH**: Armazenamento e consulta espacial ultra-rápida (sub-milissegundo) de motoristas mais próximos por raio de distância (`POST /api/v1/drivers/location` e `GET /api/v1/drivers/nearby`).
+  - **Route Estimate Caching (TTL 3 min)**: Caching inteligente de estimativas de preços/rotas no Redis. A 1ª consulta executa a predição no ML (*Cache MISS*), enquanto as consultas subsequentes para a mesma rota retornam instantaneamente do Redis (*Cache HIT - `cached: true`*).
 - **Segurança & Autenticação Stateless (JWT + RBAC)**:
   - Autenticação via `POST /api/v1/auth/login` gerando tokens JWT (`golang-jwt/jwt/v5`).
   - Middlewares de autorização granular por perfil: apenas passageiros (`passenger`) podem solicitar corridas e apenas motoristas (`driver`) podem aceitar corridas, retornando `401 Unauthorized` ou `403 Forbidden` quando não autorizado.

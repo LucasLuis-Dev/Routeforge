@@ -9,13 +9,14 @@ import (
 
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/domain"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/pkg/geo"
+	redisRepo "github.com/LucasLuis-Dev/Routeforge/backend-go/repository/redis"
 	"github.com/google/uuid"
 )
 
 const (
-	DefaultBaseFare   = 2.50
-	DefaultRatePerKM  = 1.80
-	DefaultCitySpeed  = 30.0 // km/h
+	DefaultBaseFare  = 2.50
+	DefaultRatePerKM = 1.80
+	DefaultCitySpeed = 30.0 // km/h
 )
 
 type EstimateRequest struct {
@@ -33,6 +34,7 @@ type EstimateResponse struct {
 	SurgeMultiplier float64 `json:"surge_multiplier"`
 	EstimatedPrice  float64 `json:"estimated_price"`
 	IsFallback      bool    `json:"is_fallback"`
+	Cached          bool    `json:"cached,omitempty"`
 }
 
 type CreateRideRequest struct {
@@ -57,16 +59,23 @@ type RideService interface {
 }
 
 type rideService struct {
-	userRepo   domain.UserRepository
-	rideRepo   domain.RideRepository
-	mlClient   domain.PredictionClient
+	userRepo      domain.UserRepository
+	rideRepo      domain.RideRepository
+	mlClient      domain.PredictionClient
+	estimateCache redisRepo.EstimateCache
 }
 
-func NewRideService(userRepo domain.UserRepository, rideRepo domain.RideRepository, mlClient domain.PredictionClient) RideService {
+func NewRideService(
+	userRepo domain.UserRepository,
+	rideRepo domain.RideRepository,
+	mlClient domain.PredictionClient,
+	estimateCache redisRepo.EstimateCache,
+) RideService {
 	return &rideService{
-		userRepo: userRepo,
-		rideRepo: rideRepo,
-		mlClient: mlClient,
+		userRepo:      userRepo,
+		rideRepo:      rideRepo,
+		mlClient:      mlClient,
+		estimateCache: estimateCache,
 	}
 }
 
@@ -78,6 +87,23 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 		return nil, errors.New("coordenadas de destino inválidas")
 	}
 
+	// 1. Tentar obter a estimativa do Redis Cache (Cache HIT)
+	if s.estimateCache != nil {
+		if cached, err := s.estimateCache.GetEstimate(ctx, req.OriginLatitude, req.OriginLongitude, req.DestinationLatitude, req.DestinationLongitude); err == nil && cached != nil {
+			return &EstimateResponse{
+				DistanceKM:      cached.DistanceKM,
+				ETAMinutes:      cached.ETAMinutes,
+				BaseFare:        cached.BaseFare,
+				DistanceFare:    cached.DistanceFare,
+				SurgeMultiplier: cached.SurgeMultiplier,
+				EstimatedPrice:  cached.EstimatedPrice,
+				IsFallback:      cached.IsFallback,
+				Cached:          true,
+			}, nil
+		}
+	}
+
+	// 2. Cache MISS: Calcular distância e solicitar ao modelo de ML
 	distanceKM := geo.CalculateHaversineDistance(
 		req.OriginLatitude, req.OriginLongitude,
 		req.DestinationLatitude, req.DestinationLongitude,
@@ -90,6 +116,8 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 		DayOfWeek:  int(now.Weekday()),
 	}
 
+	var resp *EstimateResponse
+
 	predResp, err := s.mlClient.Predict(ctx, predReq)
 	if err != nil {
 		// FALLBACK PATTERN: Microsserviço de ML indisponível ou timeout
@@ -99,7 +127,7 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 		fallbackPrice := math.Round((DefaultBaseFare+fallbackDistanceFare)*100) / 100
 		fallbackETA := int(math.Max(2, math.Round(distanceKM/DefaultCitySpeed*60.0)))
 
-		return &EstimateResponse{
+		resp = &EstimateResponse{
 			DistanceKM:      distanceKM,
 			ETAMinutes:      fallbackETA,
 			BaseFare:        DefaultBaseFare,
@@ -107,18 +135,35 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 			SurgeMultiplier: 1.00,
 			EstimatedPrice:  fallbackPrice,
 			IsFallback:      true,
-		}, nil
+			Cached:          false,
+		}
+	} else {
+		resp = &EstimateResponse{
+			DistanceKM:      distanceKM,
+			ETAMinutes:      predResp.ETAMinutes,
+			BaseFare:        predResp.BaseFare,
+			DistanceFare:    predResp.DistanceFare,
+			SurgeMultiplier: predResp.SurgeMultiplier,
+			EstimatedPrice:  predResp.EstimatedPrice,
+			IsFallback:      false,
+			Cached:          false,
+		}
 	}
 
-	return &EstimateResponse{
-		DistanceKM:      distanceKM,
-		ETAMinutes:      predResp.ETAMinutes,
-		BaseFare:        predResp.BaseFare,
-		DistanceFare:    predResp.DistanceFare,
-		SurgeMultiplier: predResp.SurgeMultiplier,
-		EstimatedPrice:  predResp.EstimatedPrice,
-		IsFallback:      false,
-	}, nil
+	// 3. Salvar no Redis Cache por 3 minutos (TTL 180s)
+	if s.estimateCache != nil && !resp.IsFallback {
+		_ = s.estimateCache.SetEstimate(ctx, req.OriginLatitude, req.OriginLongitude, req.DestinationLatitude, req.DestinationLongitude, &redisRepo.CachedEstimate{
+			DistanceKM:      resp.DistanceKM,
+			ETAMinutes:      resp.ETAMinutes,
+			BaseFare:        resp.BaseFare,
+			DistanceFare:    resp.DistanceFare,
+			SurgeMultiplier: resp.SurgeMultiplier,
+			EstimatedPrice:  resp.EstimatedPrice,
+			IsFallback:      resp.IsFallback,
+		}, 3*time.Minute)
+	}
+
+	return resp, nil
 }
 
 func (s *rideService) CreateRide(ctx context.Context, req CreateRideRequest) (*domain.Ride, error) {

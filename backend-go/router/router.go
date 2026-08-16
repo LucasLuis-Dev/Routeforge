@@ -19,6 +19,7 @@ func NewRouter(
 	userH *handler.UserHandler,
 	rideH *handler.RideHandler,
 	authH *handler.AuthHandler,
+	driverH *handler.DriverHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -50,6 +51,12 @@ func NewRouter(
 		// Rotas Autenticadas via Token JWT
 		r.Group(func(r chi.Router) {
 			r.Use(customMw.AuthMiddleware)
+
+			// Atualização de Localização GPS em Tempo Real (Restrito a Motoristas)
+			r.With(customMw.RequireRole(domain.UserTypeDriver)).Post("/drivers/location", driverH.UpdateLocation)
+
+			// Consulta de Motoristas Próximos (Redis GEOSEARCH)
+			r.Get("/drivers/nearby", driverH.FindNearby)
 
 			// Solicitar corrida (Restrito a Passageiros)
 			r.With(customMw.RequireRole(domain.UserTypePassenger)).Post("/rides", rideH.CreateRide)
