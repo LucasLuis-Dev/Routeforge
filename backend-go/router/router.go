@@ -3,9 +3,11 @@ package router
 import (
 	"net/http"
 
+	_ "github.com/LucasLuis-Dev/Routeforge/backend-go/docs"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 func NewRouter(healthH *handler.HealthHandler, userH *handler.UserHandler, rideH *handler.RideHandler) http.Handler {
@@ -15,6 +17,11 @@ func NewRouter(healthH *handler.HealthHandler, userH *handler.UserHandler, rideH
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+
+	// Swagger UI Documentation
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+	))
 
 	// Healthcheck
 	r.Get("/health", healthH.HealthCheck)

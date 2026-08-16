@@ -12,6 +12,9 @@ O **Routeforge** é um projeto de portfólio backend focado no domínio de mobil
 - **Serviço Principal em Go**: API REST desenvolvida com `go-chi`, injeção de dependências por interface e separação rigorosa em camadas (*Handler*, *Service*, *Repository*, *Client*).
 - **Microsserviço de Predição (FastAPI / Python)**: Modelo `RandomForestRegressor` treinado com 2.500 amostras sintéticas para estimar o tempo de chegada (ETA) e o multiplicador de preço dinâmico (*Surge Pricing*) com base na distância e momento temporal.
 - **Resiliência & Alta Disponibilidade (*Fallback Pattern*)**: Cliente HTTP em Go com `timeout` de 2s e mecanismo de **contingência automática**. Se o microsserviço de ML falhar ou estiver indisponível, a API em Go assume uma precificação padrão sem interromper a experiência do usuário.
+- **Documentação Interativa (Swagger / OpenAPI)**:
+  - 🚀 **Go API Swagger UI**: [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
+  - 🤖 **FastAPI ML OpenAPI**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Persistência Relacional**: Banco de dados PostgreSQL 16 com esquemas normalizados (`users`, `rides`, `price_history`) e migrações SQL versionadas.
 - **Infraestrutura Otimizada**: Orquestração via Docker e Docker Compose com compilação multi-stage em Go (`golang:1.23-alpine` -> `alpine:latest`).
 
