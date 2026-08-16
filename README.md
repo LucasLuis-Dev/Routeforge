@@ -82,9 +82,10 @@ Para entender em detalhes todos os Requisitos Funcionais (RF), Requisitos Não-F
 - [x] **Etapa 5: Serviço Go — Handlers HTTP & Rotas (`go-chi`)**
   - Endpoints REST para cadastro de usuários (`/api/v1/users`), estimativa (`/estimate`), solicitação (`/rides`), aceite (`/accept`), conclusão (`/complete`) e auditoria (`/rides/{id}`).
   - Roteamento com `go-chi/chi/v5`, middlewares de log/recovery e testes com `httptest`.
-- [ ] **Etapa 6: Conteinerização Multi-stage & Integração End-to-End**
-  - `Dockerfile` otimizado para Go.
-  - Testes de resiliência em tempo real simulando queda do microsserviço de ML.
+- [x] **Etapa 6: Conteinerização Multi-stage & Integração End-to-End**
+  - `Dockerfile` multi-stage otimizado para a API em Go.
+  - Orquestração dos 3 microsserviços via Docker Compose.
+  - Validação E2E do ciclo de vida da corrida e testes de resiliência em tempo real simulando queda do microsserviço de ML (Fallback Pattern comprovado).
 - [ ] **Etapa 7: Documentação Final & Guia de Produção**
   - Justificativas arquiteturais detalhadas e roadmap de evolução do modelo preditivo em produção.
 
