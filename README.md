@@ -71,9 +71,9 @@ Para entender em detalhes todos os Requisitos Funcionais (RF), Requisitos Não-F
   - Script de geração de dados sintéticos (2.500 amostras) e treino do modelo `RandomForestRegressor`.
   - Endpoints REST `/health` e `/predict` validados com Pydantic V2.
   - Testes unitários com `pytest` (100% aprovados) e `Dockerfile` multi-stage executável.
-- [ ] **Etapa 3: Serviço Go — Camada de Domínio & Repositórios (SOLID)**
-  - Entidades de domínio (`User`, `Ride`, `PriceHistory`) e interfaces de repositórios.
-  - Implementação da camada de persistência com `database/sql`.
+- [x] **Etapa 3: Serviço Go — Camada de Domínio & Repositórios (SOLID)**
+  - Entidades de domínio (`User`, `Ride`, `PriceHistory`) e abstrações por interface.
+  - Implementação concreta dos repositórios PostgreSQL (`userRepository` e `rideRepository`) com `database/sql` e pool de conexões.
 - [ ] **Etapa 4: Serviço Go — Regras de Negócio & Resiliência (Fallback)**
   - Cálculo de distância via Fórmula de Haversine.
   - Cliente HTTP para o serviço de ML com `timeout` e algoritmo de contingência (*Fallback*).
