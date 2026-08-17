@@ -47,6 +47,11 @@ func (m *MockRideRepository) Create(ctx context.Context, ride *domain.Ride) erro
 	return args.Error(0)
 }
 
+func (m *MockRideRepository) CreateRideWithOutbox(ctx context.Context, ride *domain.Ride, history *domain.PriceHistory, outbox *domain.OutboxEvent) error {
+	args := m.Called(ctx, ride, history, outbox)
+	return args.Error(0)
+}
+
 func (m *MockRideRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Ride, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
@@ -57,6 +62,11 @@ func (m *MockRideRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 
 func (m *MockRideRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.RideStatus, driverID *uuid.UUID, finalPrice *float64) error {
 	args := m.Called(ctx, id, status, driverID, finalPrice)
+	return args.Error(0)
+}
+
+func (m *MockRideRepository) UpdateStatusWithOutbox(ctx context.Context, id uuid.UUID, status domain.RideStatus, driverID *uuid.UUID, finalPrice *float64, outbox *domain.OutboxEvent) error {
+	args := m.Called(ctx, id, status, driverID, finalPrice, outbox)
 	return args.Error(0)
 }
 
@@ -178,8 +188,7 @@ func TestCreateRide_Success(t *testing.T) {
 		EstimatedPrice:  6.50,
 	}, nil)
 
-	mockRideRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
-	mockRideRepo.On("SavePriceHistory", mock.Anything, mock.Anything).Return(nil)
+	mockRideRepo.On("CreateRideWithOutbox", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	ride, err := svc.CreateRide(context.Background(), req)
 
@@ -218,7 +227,7 @@ func TestAcceptRide_Success(t *testing.T) {
 
 	mockUserRepo.On("GetByID", mock.Anything, driverID).Return(driver, nil)
 	mockRideRepo.On("GetByID", mock.Anything, rideID).Return(existingRide, nil)
-	mockRideRepo.On("UpdateStatus", mock.Anything, rideID, domain.StatusAccepted, &driverID, (*float64)(nil)).Return(nil)
+	mockRideRepo.On("UpdateStatusWithOutbox", mock.Anything, rideID, domain.StatusAccepted, &driverID, (*float64)(nil), mock.Anything).Return(nil)
 
 	ride, err := svc.AcceptRide(context.Background(), rideID, driverID)
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -124,7 +125,7 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 
 	predResp, err := s.mlClient.Predict(ctx, predReq)
 	if err != nil {
-		// FALLBACK PATTERN: Microsserviço de ML indisponível ou timeout
+		// FALLBACK PATTERN: Acionado por erro HTTP/Timeout ou por Circuit Breaker (gobreaker.ErrOpenState)
 		fmt.Printf("Fallback acionado no cálculo de corrida (Motivo: %v)\n", err)
 
 		fallbackDistanceFare := math.Round(distanceKM*DefaultRatePerKM*100) / 100
@@ -202,10 +203,6 @@ func (s *rideService) CreateRide(ctx context.Context, req CreateRideRequest) (*d
 		ETAMinutes:           estimate.ETAMinutes,
 	}
 
-	if err := s.rideRepo.Create(ctx, ride); err != nil {
-		return nil, fmt.Errorf("erro ao salvar corrida no banco de dados: %w", err)
-	}
-
 	priceHistory := &domain.PriceHistory{
 		ID:                   uuid.New(),
 		RideID:               ride.ID,
@@ -216,17 +213,27 @@ func (s *rideService) CreateRide(ctx context.Context, req CreateRideRequest) (*d
 		IsFallback:           estimate.IsFallback,
 	}
 
-	_ = s.rideRepo.SavePriceHistory(ctx, priceHistory)
+	// TRANSACTIONAL OUTBOX PATTERN: Salva corrida, histórico e evento de outbox na mesma transação atômica
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"ride_id":         ride.ID,
+		"passenger_id":    ride.PassengerID,
+		"estimated_price": ride.EstimatedPrice,
+		"status":          ride.Status,
+		"timestamp":       time.Now().UTC(),
+	})
 
-	// Emitir evento assíncrono no RabbitMQ: ride.requested
-	if s.eventPublisher != nil {
-		_ = s.eventPublisher.PublishEvent(ctx, "ride.requested", map[string]interface{}{
-			"ride_id":         ride.ID,
-			"passenger_id":    ride.PassengerID,
-			"estimated_price": ride.EstimatedPrice,
-			"status":          ride.Status,
-			"timestamp":       time.Now(),
-		})
+	outboxEvent := &domain.OutboxEvent{
+		ID:            uuid.New(),
+		AggregateType: "RIDE",
+		AggregateID:   ride.ID,
+		RoutingKey:    "ride.requested",
+		Payload:       eventPayload,
+		Status:        domain.OutboxStatusPending,
+		CreatedAt:     time.Now().UTC(),
+	}
+
+	if err := s.rideRepo.CreateRideWithOutbox(ctx, ride, priceHistory, outboxEvent); err != nil {
+		return nil, fmt.Errorf("erro ao salvar corrida e evento outbox no banco de dados: %w", err)
 	}
 
 	return ride, nil
@@ -250,22 +257,29 @@ func (s *rideService) AcceptRide(ctx context.Context, rideID uuid.UUID, driverID
 		return nil, errors.New("corrida não está disponível para aceite")
 	}
 
-	if err := s.rideRepo.UpdateStatus(ctx, rideID, domain.StatusAccepted, &driverID, nil); err != nil {
-		return nil, fmt.Errorf("erro ao aceitar corrida: %w", err)
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"ride_id":   ride.ID,
+		"driver_id": driverID,
+		"status":    domain.StatusAccepted,
+		"timestamp": time.Now().UTC(),
+	})
+
+	outboxEvent := &domain.OutboxEvent{
+		ID:            uuid.New(),
+		AggregateType: "RIDE",
+		AggregateID:   ride.ID,
+		RoutingKey:    "ride.accepted",
+		Payload:       eventPayload,
+		Status:        domain.OutboxStatusPending,
+		CreatedAt:     time.Now().UTC(),
+	}
+
+	if err := s.rideRepo.UpdateStatusWithOutbox(ctx, rideID, domain.StatusAccepted, &driverID, nil, outboxEvent); err != nil {
+		return nil, fmt.Errorf("erro ao aceitar corrida com outbox: %w", err)
 	}
 
 	ride.Status = domain.StatusAccepted
 	ride.DriverID = &driverID
-
-	// Emitir evento assíncrono no RabbitMQ: ride.accepted
-	if s.eventPublisher != nil {
-		_ = s.eventPublisher.PublishEvent(ctx, "ride.accepted", map[string]interface{}{
-			"ride_id":   ride.ID,
-			"driver_id": driverID,
-			"status":    ride.Status,
-			"timestamp": time.Now(),
-		})
-	}
 
 	return ride, nil
 }
@@ -281,22 +295,29 @@ func (s *rideService) CompleteRide(ctx context.Context, rideID uuid.UUID) (*doma
 	}
 
 	finalPrice := ride.EstimatedPrice
-	if err := s.rideRepo.UpdateStatus(ctx, rideID, domain.StatusCompleted, nil, &finalPrice); err != nil {
-		return nil, fmt.Errorf("erro ao finalizar corrida: %w", err)
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"ride_id":     ride.ID,
+		"final_price": finalPrice,
+		"status":      domain.StatusCompleted,
+		"timestamp":   time.Now().UTC(),
+	})
+
+	outboxEvent := &domain.OutboxEvent{
+		ID:            uuid.New(),
+		AggregateType: "RIDE",
+		AggregateID:   ride.ID,
+		RoutingKey:    "ride.completed",
+		Payload:       eventPayload,
+		Status:        domain.OutboxStatusPending,
+		CreatedAt:     time.Now().UTC(),
+	}
+
+	if err := s.rideRepo.UpdateStatusWithOutbox(ctx, rideID, domain.StatusCompleted, nil, &finalPrice, outboxEvent); err != nil {
+		return nil, fmt.Errorf("erro ao finalizar corrida com outbox: %w", err)
 	}
 
 	ride.Status = domain.StatusCompleted
 	ride.FinalPrice = &finalPrice
-
-	// Emitir evento assíncrono no RabbitMQ: ride.completed
-	if s.eventPublisher != nil {
-		_ = s.eventPublisher.PublishEvent(ctx, "ride.completed", map[string]interface{}{
-			"ride_id":     ride.ID,
-			"final_price": finalPrice,
-			"status":      ride.Status,
-			"timestamp":   time.Now(),
-		})
-	}
 
 	return ride, nil
 }

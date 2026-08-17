@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ErrRideNotFound       = errors.New("corrida não encontrada")
+	ErrRideNotFound            = errors.New("corrida não encontrada")
 	ErrInvalidStatusTransition = errors.New("transição de status de corrida inválida")
 	ErrDriverAlreadyAssigned   = errors.New("corrida já possui motorista atribuído")
 )
@@ -42,20 +42,22 @@ type Ride struct {
 }
 
 type PriceHistory struct {
-	ID                    uuid.UUID `json:"id"`
-	RideID                uuid.UUID `json:"ride_id"`
-	BaseFare              float64   `json:"base_fare"`
-	DistanceFare          float64   `json:"distance_fare"`
-	SurgeMultiplier       float64   `json:"surge_multiplier"`
-	FinalCalculatedPrice  float64   `json:"final_calculated_price"`
-	IsFallback            bool      `json:"is_fallback"`
-	CalculatedAt          time.Time `json:"calculated_at"`
+	ID                   uuid.UUID `json:"id"`
+	RideID               uuid.UUID `json:"ride_id"`
+	BaseFare             float64   `json:"base_fare"`
+	DistanceFare         float64   `json:"distance_fare"`
+	SurgeMultiplier      float64   `json:"surge_multiplier"`
+	FinalCalculatedPrice float64   `json:"final_calculated_price"`
+	IsFallback           bool      `json:"is_fallback"`
+	CalculatedAt         time.Time `json:"calculated_at"`
 }
 
 type RideRepository interface {
 	Create(ctx context.Context, ride *Ride) error
+	CreateRideWithOutbox(ctx context.Context, ride *Ride, history *PriceHistory, outbox *OutboxEvent) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Ride, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status RideStatus, driverID *uuid.UUID, finalPrice *float64) error
+	UpdateStatusWithOutbox(ctx context.Context, id uuid.UUID, status RideStatus, driverID *uuid.UUID, finalPrice *float64, outbox *OutboxEvent) error
 	SavePriceHistory(ctx context.Context, history *PriceHistory) error
 	GetPriceHistoryByRideID(ctx context.Context, rideID uuid.UUID) ([]*PriceHistory, error)
 }

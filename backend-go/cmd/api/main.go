@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -83,6 +84,14 @@ func main() {
 	// Repositórios
 	userRepo := postgres.NewUserRepository(db)
 	rideRepo := postgres.NewRideRepository(db)
+	outboxRepo := postgres.NewOutboxRepository(db)
+
+	// Inicializa o Transactional Outbox Worker em background
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	outboxProcessor := messaging.NewOutboxProcessor(outboxRepo, eventPublisher, 2*time.Second)
+	go outboxProcessor.Start(ctx)
 
 	var geoRepo redisRepo.GeoRepository
 	var estimateCache redisRepo.EstimateCache
@@ -92,7 +101,7 @@ func main() {
 		estimateCache = redisRepo.NewEstimateCache(rdb)
 	}
 
-	// Cliente ML (com 2s de timeout)
+	// Cliente ML (com 2s de timeout e gobreaker Circuit Breaker)
 	mlClient := client.NewMLClient(mlServiceURL, 2*time.Second)
 
 	// Serviços

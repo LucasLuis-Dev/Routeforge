@@ -47,3 +47,18 @@ CREATE INDEX IF NOT EXISTS idx_rides_passenger_id ON rides(passenger_id);
 CREATE INDEX IF NOT EXISTS idx_rides_driver_id ON rides(driver_id);
 CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
 CREATE INDEX IF NOT EXISTS idx_price_history_ride_id ON price_history(ride_id);
+
+-- Table: outbox_events (Transactional Outbox Pattern)
+CREATE TABLE IF NOT EXISTS outbox_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_type VARCHAR(50) NOT NULL,
+    aggregate_id UUID NOT NULL,
+    routing_key VARCHAR(100) NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_events_status_created ON outbox_events(status, created_at);
+
