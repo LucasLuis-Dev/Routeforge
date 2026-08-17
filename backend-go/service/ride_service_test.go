@@ -91,7 +91,7 @@ func TestCreateEstimate_Success_WithML(t *testing.T) {
 	mockRideRepo := new(MockRideRepository)
 	mockMLClient := new(MockPredictionClient)
 
-	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil)
+	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil, nil)
 
 	req := EstimateRequest{
 		OriginLatitude:       -23.550520,
@@ -124,7 +124,7 @@ func TestCreateEstimate_Fallback_WhenMLError(t *testing.T) {
 	mockRideRepo := new(MockRideRepository)
 	mockMLClient := new(MockPredictionClient)
 
-	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil)
+	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil, nil)
 
 	req := EstimateRequest{
 		OriginLatitude:       -23.550520,
@@ -151,7 +151,7 @@ func TestCreateRide_Success(t *testing.T) {
 	mockRideRepo := new(MockRideRepository)
 	mockMLClient := new(MockPredictionClient)
 
-	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil)
+	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil, nil)
 
 	passengerID := uuid.New()
 	passenger := &domain.User{
@@ -198,7 +198,7 @@ func TestAcceptRide_Success(t *testing.T) {
 	mockRideRepo := new(MockRideRepository)
 	mockMLClient := new(MockPredictionClient)
 
-	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil)
+	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil, nil)
 
 	rideID := uuid.New()
 	driverID := uuid.New()
@@ -233,7 +233,7 @@ func TestAcceptRide_InvalidUserType(t *testing.T) {
 	mockRideRepo := new(MockRideRepository)
 	mockMLClient := new(MockPredictionClient)
 
-	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil)
+	svc := NewRideService(mockUserRepo, mockRideRepo, mockMLClient, nil, nil)
 
 	rideID := uuid.New()
 	passengerID := uuid.New()

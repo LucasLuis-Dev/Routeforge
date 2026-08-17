@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/LucasLuis-Dev/Routeforge/backend-go/pkg/messaging"
 	redisRepo "github.com/LucasLuis-Dev/Routeforge/backend-go/repository/redis"
+	ws "github.com/LucasLuis-Dev/Routeforge/backend-go/websocket"
 )
 
 type UpdateLocationRequest struct {
@@ -15,11 +18,17 @@ type UpdateLocationRequest struct {
 }
 
 type DriverHandler struct {
-	geoRepo redisRepo.GeoRepository
+	geoRepo        redisRepo.GeoRepository
+	eventPublisher messaging.EventPublisher
+	wsHub          *ws.Hub
 }
 
-func NewDriverHandler(geoRepo redisRepo.GeoRepository) *DriverHandler {
-	return &DriverHandler{geoRepo: geoRepo}
+func NewDriverHandler(geoRepo redisRepo.GeoRepository, eventPublisher messaging.EventPublisher, wsHub *ws.Hub) *DriverHandler {
+	return &DriverHandler{
+		geoRepo:        geoRepo,
+		eventPublisher: eventPublisher,
+		wsHub:          wsHub,
+	}
 }
 
 func (h *DriverHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
@@ -34,13 +43,31 @@ func (h *DriverHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Atualiza no Redis GEO
 	if err := h.geoRepo.UpdateDriverLocation(r.Context(), req.DriverID, req.Latitude, req.Longitude); err != nil {
 		respondError(w, http.StatusInternalServerError, "erro ao atualizar posição GPS do motorista no Redis")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
-		"message":   "localização GPS do motorista atualizada com sucesso no Redis GEO",
+	locationPayload := map[string]interface{}{
+		"driver_id": req.DriverID,
+		"latitude":  req.Latitude,
+		"longitude": req.Longitude,
+		"timestamp": time.Now(),
+	}
+
+	// 2. Dispara evento assíncrono no RabbitMQ: driver.location_updated
+	if h.eventPublisher != nil {
+		_ = h.eventPublisher.PublishEvent(r.Context(), "driver.location_updated", locationPayload)
+	}
+
+	// 3. Transmite em tempo real via WebSocket Streaming Gateway para passageiros em escuta
+	if h.wsHub != nil {
+		h.wsHub.BroadcastEvent("driver_location_update", locationPayload)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":   "localização GPS do motorista atualizada com sucesso no Redis GEO, RabbitMQ & WebSockets",
 		"driver_id": req.DriverID,
 	})
 }

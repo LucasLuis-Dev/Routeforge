@@ -18,14 +18,14 @@ model = None
 async def lifespan(app: FastAPI):
     global model
     if not os.path.exists(MODEL_PATH):
-        print(f"⚠️ Modelo {MODEL_PATH} não encontrado. Iniciando treinamento automático...")
+        print(f"Modelo {MODEL_PATH} não encontrado. Iniciando treinamento automático...")
         model = train_and_save_model(MODEL_PATH)
     else:
-        print(f"📦 Carregando modelo treinado de {MODEL_PATH}...")
+        print(f"Carregando modelo treinado de {MODEL_PATH}...")
         model = joblib.load(MODEL_PATH)
-    print("✅ Modelo ML pronto para requisições!")
+    print("Modelo ML pronto para requisições!")
     yield
-    print("🧹 Encerrando microsserviço de ML...")
+    print("Encerrando microsserviço de ML...")
 
 app = FastAPI(
     title="Routeforge ML Service",

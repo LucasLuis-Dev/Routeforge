@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/domain"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/pkg/geo"
+	"github.com/LucasLuis-Dev/Routeforge/backend-go/pkg/messaging"
 	redisRepo "github.com/LucasLuis-Dev/Routeforge/backend-go/repository/redis"
 	"github.com/google/uuid"
 )
@@ -59,10 +60,11 @@ type RideService interface {
 }
 
 type rideService struct {
-	userRepo      domain.UserRepository
-	rideRepo      domain.RideRepository
-	mlClient      domain.PredictionClient
-	estimateCache redisRepo.EstimateCache
+	userRepo       domain.UserRepository
+	rideRepo       domain.RideRepository
+	mlClient       domain.PredictionClient
+	estimateCache  redisRepo.EstimateCache
+	eventPublisher messaging.EventPublisher
 }
 
 func NewRideService(
@@ -70,12 +72,14 @@ func NewRideService(
 	rideRepo domain.RideRepository,
 	mlClient domain.PredictionClient,
 	estimateCache redisRepo.EstimateCache,
+	eventPublisher messaging.EventPublisher,
 ) RideService {
 	return &rideService{
-		userRepo:      userRepo,
-		rideRepo:      rideRepo,
-		mlClient:      mlClient,
-		estimateCache: estimateCache,
+		userRepo:       userRepo,
+		rideRepo:       rideRepo,
+		mlClient:       mlClient,
+		estimateCache:  estimateCache,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -121,7 +125,7 @@ func (s *rideService) CreateEstimate(ctx context.Context, req EstimateRequest) (
 	predResp, err := s.mlClient.Predict(ctx, predReq)
 	if err != nil {
 		// FALLBACK PATTERN: Microsserviço de ML indisponível ou timeout
-		fmt.Printf("⚠️ Fallback acionado no cálculo de corrida (Motivo: %v)\n", err)
+		fmt.Printf("Fallback acionado no cálculo de corrida (Motivo: %v)\n", err)
 
 		fallbackDistanceFare := math.Round(distanceKM*DefaultRatePerKM*100) / 100
 		fallbackPrice := math.Round((DefaultBaseFare+fallbackDistanceFare)*100) / 100
@@ -214,6 +218,17 @@ func (s *rideService) CreateRide(ctx context.Context, req CreateRideRequest) (*d
 
 	_ = s.rideRepo.SavePriceHistory(ctx, priceHistory)
 
+	// Emitir evento assíncrono no RabbitMQ: ride.requested
+	if s.eventPublisher != nil {
+		_ = s.eventPublisher.PublishEvent(ctx, "ride.requested", map[string]interface{}{
+			"ride_id":         ride.ID,
+			"passenger_id":    ride.PassengerID,
+			"estimated_price": ride.EstimatedPrice,
+			"status":          ride.Status,
+			"timestamp":       time.Now(),
+		})
+	}
+
 	return ride, nil
 }
 
@@ -241,6 +256,17 @@ func (s *rideService) AcceptRide(ctx context.Context, rideID uuid.UUID, driverID
 
 	ride.Status = domain.StatusAccepted
 	ride.DriverID = &driverID
+
+	// Emitir evento assíncrono no RabbitMQ: ride.accepted
+	if s.eventPublisher != nil {
+		_ = s.eventPublisher.PublishEvent(ctx, "ride.accepted", map[string]interface{}{
+			"ride_id":   ride.ID,
+			"driver_id": driverID,
+			"status":    ride.Status,
+			"timestamp": time.Now(),
+		})
+	}
+
 	return ride, nil
 }
 
@@ -261,6 +287,17 @@ func (s *rideService) CompleteRide(ctx context.Context, rideID uuid.UUID) (*doma
 
 	ride.Status = domain.StatusCompleted
 	ride.FinalPrice = &finalPrice
+
+	// Emitir evento assíncrono no RabbitMQ: ride.completed
+	if s.eventPublisher != nil {
+		_ = s.eventPublisher.PublishEvent(ctx, "ride.completed", map[string]interface{}{
+			"ride_id":     ride.ID,
+			"final_price": finalPrice,
+			"status":      ride.Status,
+			"timestamp":   time.Now(),
+		})
+	}
+
 	return ride, nil
 }
 

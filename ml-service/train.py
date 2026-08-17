@@ -51,16 +51,16 @@ def generate_synthetic_data(n_samples=2500, random_state=42):
     return X, y
 
 def train_and_save_model(model_path="model.joblib"):
-    print("🤖 Gerando dataset sintético de corridas...")
+    print("Gerando dataset sintético de corridas...")
     X, y = generate_synthetic_data()
     
-    print("🧠 Treinando modelo Random Forest Regressor...")
+    print("Treinando modelo Random Forest Regressor...")
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X, y)
     
-    print(f"💾 Salvando modelo em {model_path}...")
+    print(f"Salvando modelo em {model_path}...")
     joblib.dump(model, model_path)
-    print("✅ Modelo treinado com sucesso!")
+    print("Modelo treinado com sucesso!")
     return model
 
 if __name__ == "__main__":

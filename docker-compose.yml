@@ -30,6 +30,22 @@ services:
       timeout: 3s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: routeforge-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: routeforge_user
+      RABBITMQ_DEFAULT_PASS: routeforge_password
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   ml-service:
     build:
       context: ./ml-service
@@ -59,10 +75,13 @@ services:
       - ML_SERVICE_URL=http://ml-service:8000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - RABBITMQ_URL=amqp://routeforge_user:routeforge_password@rabbitmq:5672/
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       ml-service:
         condition: service_started

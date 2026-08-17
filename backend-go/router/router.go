@@ -20,6 +20,7 @@ func NewRouter(
 	rideH *handler.RideHandler,
 	authH *handler.AuthHandler,
 	driverH *handler.DriverHandler,
+	wsH *handler.WSHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -41,6 +42,9 @@ func NewRouter(
 
 	// API v1 Sub-router
 	r.Route("/api/v1", func(r chi.Router) {
+		// Gateway de WebSockets para Streaming de Localização em Tempo Real
+		r.Get("/ws", wsH.ServeWS)
+
 		// Rotas Públicas
 		r.Post("/users", userH.CreateUser)
 		r.Post("/auth/login", authH.Login)

@@ -11,6 +11,10 @@ O **Routeforge** é um projeto de portfólio backend focado no domínio de mobil
 ### 🌟 Destaques Arquiteturais
 - **Serviço Principal em Go**: API REST desenvolvida com `go-chi`, injeção de dependências por interface e separação rigorosa em camadas (*Handler*, *Service*, *Repository*, *Client*).
 - **Microsserviço de Predição (FastAPI / Python)**: Modelo `RandomForestRegressor` treinado com 2.500 amostras sintéticas para estimar o tempo de chegada (ETA) e o multiplicador de preço dinâmico (*Surge Pricing*) com base na distância e momento temporal.
+- **Arquitetura Orientada a Eventos & Tempo Real (Event-Driven Architecture)**:
+  - **RabbitMQ 3 (Topic Exchange `routeforge_events`)**: Emissão desacoplada de eventos de domínio (`ride.requested`, `ride.accepted`, `ride.completed`, `driver.location_updated`). Permite que microsserviços de notificação push, faturamento e auditoria processem dados assincronamente.
+  - **WebSocket Streaming Gateway (`GET /api/v1/ws`)**: Gateway de WebSockets com multiplexação por `Hub` para streaming em tempo real do rastreamento GPS de motoristas (*Driver Tracking*) para passageiros.
+  - 🐰 **RabbitMQ Management Dashboard**: [http://localhost:15672](http://localhost:15672) (credenciais: `routeforge_user` / `routeforge_password`)
 - **Indexação Geográfica em Tempo Real & Caching (Redis 7)**:
   - **Redis GEOADD & GEOSEARCH**: Armazenamento e consulta espacial ultra-rápida (sub-milissegundo) de motoristas mais próximos por raio de distância (`POST /api/v1/drivers/location` e `GET /api/v1/drivers/nearby`).
   - **Route Estimate Caching (TTL 3 min)**: Caching inteligente de estimativas de preços/rotas no Redis. A 1ª consulta executa a predição no ML (*Cache MISS*), enquanto as consultas subsequentes para a mesma rota retornam instantaneamente do Redis (*Cache HIT - `cached: true`*).
