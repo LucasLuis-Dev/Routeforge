@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/client"
+	"github.com/LucasLuis-Dev/Routeforge/backend-go/domain"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/handler"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/pkg/messaging"
 	"github.com/LucasLuis-Dev/Routeforge/backend-go/repository/postgres"
@@ -101,11 +102,23 @@ func main() {
 		estimateCache = redisRepo.NewEstimateCache(rdb)
 	}
 
-	// Cliente ML (com 2s de timeout e gobreaker Circuit Breaker)
-	mlClient := client.NewMLClient(mlServiceURL, 2*time.Second)
+	mlGRPCURL := getEnvOrDefault("ML_SERVICE_GRPC_URL", "localhost:50051")
+
+	// Cliente ML gRPC (Alta Performance com Protobuf HTTP/2 & Circuit Breaker)
+	var mlClient domain.PredictionClient
+	grpcClient, err := client.NewGRPCMLClient(mlGRPCURL, 2*time.Second)
+	if err != nil {
+		log.Printf("Aviso: Não foi possível conectar via gRPC (%v). Utilizando cliente HTTP REST de fallback em %s.", err, mlServiceURL)
+		mlClient = client.NewMLClient(mlServiceURL, 2*time.Second)
+	} else {
+		log.Printf("Conexão gRPC Protobuf com ML Service estabelecida em %s com sucesso!", mlGRPCURL)
+		mlClient = grpcClient
+		defer mlClient.Close()
+	}
 
 	// Serviços
 	rideService := service.NewRideService(userRepo, rideRepo, mlClient, estimateCache, eventPublisher)
+
 
 	// Handlers HTTP & WebSockets
 	healthHandler := handler.NewHealthHandler()

@@ -87,3 +87,8 @@ func (c *mlClient) Predict(ctx context.Context, req *domain.PredictionRequest) (
 
 	return result.(*domain.PredictionResponse), nil
 }
+
+func (c *mlClient) Close() error {
+	return nil
+}
+

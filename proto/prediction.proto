@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package prediction;
+
+option go_package = "github.com/LucasLuis-Dev/Routeforge/backend-go/proto/prediction";
+
+message PredictionRequest {
+  double distance_km = 1;
+  int32 hour_of_day = 2;
+  int32 day_of_week = 3;
+  double traffic_level = 4;      // 1.0 = livre, 1.5 = moderado, 2.0 = congestionado
+  string weather_condition = 5;  // "CLEAR", "RAIN", "STORM"
+}
+
+message PredictionResponse {
+  int32 eta_minutes = 1;
+  double surge_multiplier = 2;
+  double base_fare = 3;
+  double distance_fare = 4;
+  double estimated_price = 5;
+}
+
+service PredictionService {
+  rpc PredictPricingAndETA (PredictionRequest) returns (PredictionResponse);
+}

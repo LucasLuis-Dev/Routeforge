@@ -1,14 +1,14 @@
 import os
+import threading
 import joblib
 import pandas as pd
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from app.schemas import PredictionRequest, PredictionResponse
-from train import train_and_save_model
+from train import train_and_save_model, WEATHER_MAP
+from app.grpc_server import serve as serve_grpc
 
 MODEL_PATH = os.getenv("MODEL_PATH", "model.joblib")
-
-# Multiplicadores e tarifas padrão
 BASE_FARE = 2.50
 RATE_PER_KM = 1.80
 
@@ -23,20 +23,25 @@ async def lifespan(app: FastAPI):
     else:
         print(f"Carregando modelo treinado de {MODEL_PATH}...")
         model = joblib.load(MODEL_PATH)
-    print("Modelo ML pronto para requisições!")
+
+    # Inicia o Servidor gRPC em uma thread dedicada em background
+    grpc_thread = threading.Thread(target=serve_grpc, daemon=True)
+    grpc_thread.start()
+    print("Modelo ML & Servidor gRPC prontos para requisições na porta 50051!")
+
     yield
     print("Encerrando microsserviço de ML...")
 
 app = FastAPI(
-    title="Routeforge ML Service",
-    description="Microsserviço de Predição de ETA e Preço Dinâmico (Surge Pricing)",
-    version="1.0.0",
+    title="Routeforge ML Service (HTTP & gRPC)",
+    description="Microsserviço de Predição de ETA e Preço Dinâmico (Surge Pricing via HTTP & gRPC HTTP/2 Protobuf)",
+    version="2.0.0",
     lifespan=lifespan
 )
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "routeforge-ml"}
+    return {"status": "ok", "service": "routeforge-ml", "grpc_enabled": True}
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_pricing_and_eta(request: PredictionRequest):
@@ -44,14 +49,14 @@ def predict_pricing_and_eta(request: PredictionRequest):
     if model is None:
         raise HTTPException(status_code=500, detail="Modelo ML não inicializado.")
     
-    # Prepara dataframe de entrada para o scikit-learn
     input_data = pd.DataFrame([{
         'distance_km': request.distance_km,
         'hour_of_day': request.hour_of_day,
-        'day_of_week': request.day_of_week
+        'day_of_week': request.day_of_week,
+        'traffic_level': 1.0,
+        'weather_encoded': 1.0
     }])
     
-    # Predição (retorna array [[eta_minutes, surge_multiplier]])
     prediction = model.predict(input_data)[0]
     
     predicted_eta = int(round(max(2, prediction[0])))

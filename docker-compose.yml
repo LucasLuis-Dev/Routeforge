@@ -53,8 +53,10 @@ services:
     container_name: routeforge-ml-service
     ports:
       - "8000:8000"
+      - "50051:50051"
     environment:
       - PORT=8000
+      - GRPC_PORT=50051
     restart: unless-stopped
 
   backend-go:
@@ -73,6 +75,7 @@ services:
       - DB_NAME=routeforge_db
       - DB_SSLMODE=disable
       - ML_SERVICE_URL=http://ml-service:8000
+      - ML_SERVICE_GRPC_URL=ml-service:50051
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_URL=amqp://routeforge_user:routeforge_password@rabbitmq:5672/

@@ -96,6 +96,11 @@ func (m *MockPredictionClient) Predict(ctx context.Context, req *domain.Predicti
 	return args.Get(0).(*domain.PredictionResponse), args.Error(1)
 }
 
+func (m *MockPredictionClient) Close() error {
+	return nil
+}
+
+
 func TestCreateEstimate_Success_WithML(t *testing.T) {
 	mockUserRepo := new(MockUserRepository)
 	mockRideRepo := new(MockRideRepository)

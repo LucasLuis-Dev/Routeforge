@@ -4,7 +4,13 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 
-def generate_synthetic_data(n_samples=2500, random_state=42):
+WEATHER_MAP = {
+    "CLEAR": 1.0,
+    "RAIN": 1.3,
+    "STORM": 1.6
+}
+
+def generate_synthetic_data(n_samples=3500, random_state=42):
     np.random.seed(random_state)
     
     # Features
@@ -12,35 +18,45 @@ def generate_synthetic_data(n_samples=2500, random_state=42):
     hour_of_day = np.random.randint(0, 24, n_samples)
     day_of_week = np.random.randint(0, 7, n_samples) # 0=Monday, 6=Sunday
     
-    # Base calculations with realistic noise
-    traffic_factor = np.ones(n_samples)
+    # Real-time traffic variables (Waze/Google Maps API style)
+    traffic_level = np.random.choice([1.0, 1.25, 1.5, 1.75, 2.0, 2.5], size=n_samples, p=[0.4, 0.2, 0.15, 0.1, 0.1, 0.05])
     
-    # Peak traffic hours (7-9 AM and 17-19 PM on weekdays)
+    # Weather conditions (CLEAR, RAIN, STORM)
+    weather_labels = np.random.choice(["CLEAR", "RAIN", "STORM"], size=n_samples, p=[0.7, 0.2, 0.1])
+    weather_encoded = np.array([WEATHER_MAP[w] for w in weather_labels])
+    
+    # Calculations with realistic traffic and weather adjustments
     is_weekday = day_of_week < 5
     is_morning_peak = is_weekday & (hour_of_day >= 7) & (hour_of_day <= 9)
     is_evening_peak = is_weekday & (hour_of_day >= 17) & (hour_of_day <= 19)
     is_night_weekend = (~is_weekday) & ((hour_of_day >= 21) | (hour_of_day <= 3))
     
-    traffic_factor[is_morning_peak] += np.random.uniform(0.4, 0.9, np.sum(is_morning_peak))
-    traffic_factor[is_evening_peak] += np.random.uniform(0.5, 1.1, np.sum(is_evening_peak))
+    peak_factor = np.ones(n_samples)
+    peak_factor[is_morning_peak] += np.random.uniform(0.3, 0.7, np.sum(is_morning_peak))
+    peak_factor[is_evening_peak] += np.random.uniform(0.4, 0.9, np.sum(is_evening_peak))
     
-    # Target 1: ETA in minutes (avg speed 28 km/h adjusted by traffic factor)
-    base_speed_kmh = 28.0
-    raw_eta = (distance_km / base_speed_kmh * 60.0) * traffic_factor
-    noise_eta = np.random.normal(0, 1.5, n_samples)
+    # Combined effective traffic & weather delay factor
+    combined_factor = peak_factor * traffic_level * weather_encoded
+    
+    # Target 1: ETA in minutes (base speed 30 km/h)
+    base_speed_kmh = 30.0
+    raw_eta = (distance_km / base_speed_kmh * 60.0) * combined_factor
+    noise_eta = np.random.normal(0, 1.0, n_samples)
     eta_minutes = np.clip(np.round(raw_eta + noise_eta), 2, 180)
     
-    # Target 2: Surge Multiplier (1.0 to 3.0)
-    surge_multiplier = np.ones(n_samples)
-    surge_multiplier[is_morning_peak] += np.random.uniform(0.2, 0.7, np.sum(is_morning_peak))
-    surge_multiplier[is_evening_peak] += np.random.uniform(0.3, 1.0, np.sum(is_evening_peak))
-    surge_multiplier[is_night_weekend] += np.random.uniform(0.2, 0.6, np.sum(is_night_weekend))
-    surge_multiplier = np.clip(np.round(surge_multiplier, 2), 1.0, 3.0)
+    # Target 2: Surge Multiplier (1.0 to 3.5)
+    surge_multiplier = np.ones(n_samples) * (traffic_level * 0.5 + weather_encoded * 0.5)
+    surge_multiplier[is_morning_peak] += np.random.uniform(0.2, 0.5, np.sum(is_morning_peak))
+    surge_multiplier[is_evening_peak] += np.random.uniform(0.3, 0.8, np.sum(is_evening_peak))
+    surge_multiplier[is_night_weekend] += np.random.uniform(0.2, 0.5, np.sum(is_night_weekend))
+    surge_multiplier = np.clip(np.round(surge_multiplier, 2), 1.0, 3.5)
     
     X = pd.DataFrame({
         'distance_km': distance_km,
         'hour_of_day': hour_of_day,
-        'day_of_week': day_of_week
+        'day_of_week': day_of_week,
+        'traffic_level': traffic_level,
+        'weather_encoded': weather_encoded
     })
     
     y = pd.DataFrame({
@@ -51,16 +67,16 @@ def generate_synthetic_data(n_samples=2500, random_state=42):
     return X, y
 
 def train_and_save_model(model_path="model.joblib"):
-    print("Gerando dataset sintético de corridas...")
+    print("Gerando dataset sintético enriquecido com dados de trânsito e clima em tempo real...")
     X, y = generate_synthetic_data()
     
-    print("Treinando modelo Random Forest Regressor...")
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    print("Treinando modelo Random Forest Regressor de alta precisão...")
+    model = RandomForestRegressor(n_estimators=120, random_state=42, n_jobs=-1)
     model.fit(X, y)
     
     print(f"Salvando modelo em {model_path}...")
     joblib.dump(model, model_path)
-    print("Modelo treinado com sucesso!")
+    print("Modelo ML treinado com sucesso!")
     return model
 
 if __name__ == "__main__":
